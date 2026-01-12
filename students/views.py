@@ -1,8 +1,92 @@
 from django.shortcuts import render
-from django.http import HttpResponse
+from django.http import HttpResponse, Http404
+from django.views.generic.edit import CreateView, UpdateView, DeleteView
+from django.urls import reverse_lazy
+from students.models import Student, MyModel
+from django.views.generic import ListView, DetailView
+
+from students.forms import StudentForm
+
+class StudentCreateView(CreateView):
+    model = Student
+    form_class = StudentForm
+    template_name = 'students/student_form.html'
+    success_url = reverse_lazy('students:student_list')
+
+
+class StudentUpdateView(UpdateView):
+    model = Student
+    form_class = StudentForm
+    template_name = 'students/student_form.html'
+    success_url = reverse_lazy('students:student_list')
+
+
+class MyModelCreateView(CreateView):
+    model = MyModel
+    fields = ['name', 'description']
+    template_name = 'students/mymodel_form.html'
+    success_url = reverse_lazy('students:mymodel_list')
+
+    def form_valid(self, form):
+        form.instance.created_by = self.request.user
+        return super(MyModelCreateView, self).form_valid(form)
+
+    def form_invalid(self, form):
+        response = super(MyModelCreateView, self).form_invalid(form)
+        response.context_data['error_message'] = 'please correct the errors'
+        return response
+        # form.instance.created_by = self.request.user
+        # return super(MyModelCreateView, self).form_invalid(form)
+
+
+class MyModelListView(ListView):
+    model = MyModel
+    template_name = 'students/mymodel_list.html'
+    context_object_name = 'mymodels'
+
+    def get_queryset(self):
+        queryset = super().get_queryset().filter(is_active=True)
+        return queryset
+
+
+class MyModelDetailView(DetailView):
+    model = MyModel
+    template_name = 'students/mymodel_detail.html'
+    context_object_name = 'mymodel'
+
+    # def get_additional_data(self):
+    #     return 'Это дополнительная информация'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['additional_data'] = 'Это дополнительная информация'
+        return context
+
+    def get_object(self, queryset=None):
+        obj = super().get_object(queryset)
+        if not obj.is_active:
+            raise Http404
+
+
+
+class MyModelUpdateView(UpdateView):
+    model = MyModel
+    fields = ['name', 'description']
+    template_name = 'students/mymodel_form.html'
+    success_url = reverse_lazy('students:mymodel_list')
+
+
+class MyModelDeleteView(DeleteView):
+    model = MyModel
+    template_name = 'students/mymodel_confirm_delete.html'
+    success_url = reverse_lazy('students:mymodel_list')
+
+
+
 
 def about(request):
     return render(request, 'students/about.html')
+
 
 def contact(request):
     if request.method == 'POST':
@@ -11,3 +95,27 @@ def contact(request):
 
         return HttpResponse(f"Спасибо, {name}! Сообщение получено.")
     return render(request, 'students/contact.html')
+
+
+def index(request):
+    students = Student.objects.get(id=1)
+    context = {
+        'student_name': f"{students.first_name} {students.last_name}",
+        'student_year': students.get_year_display(),
+    }
+    return render(request, 'students/index.html', context=context)
+
+
+def student_detail(request, student_id):
+    students = Student.objects.get(id=student_id)
+    context = {
+        'student': students,
+    }
+    return render(request, 'students/student_detail.html', context=context)
+
+def student_list(request):
+    students = Student.objects.all()
+    context = {
+        'students': students,
+    }
+    return render(request, 'students/student_list.html', context=context)
